@@ -1,0 +1,435 @@
+{% extends 'facturacion/base.html' %}
+{% load humanize %}
+{% load static %} {% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    :root { --dash-bg:#0e1a26; --dash-panel:#152838; --dash-panel-2:#1b3143; --dash-line:#24405a; --dash-ink:#e9f1f8; --dash-muted:#8ca6be; --dash-flow:#4cc2ff; --dash-ok:#2fd3a5; --dash-warn:#f5a623; --dash-bad:#ff5c72; }
+    .dashboard-frame { margin:-40px; min-height:calc(100vh + 80px); padding:28px 32px 56px; background:var(--dash-bg); color:var(--dash-ink); font-family:'IBM Plex Sans',sans-serif; }
+    .dashboard-frame h1,.dashboard-frame h2,.dashboard-frame h3 { font-family:'Chivo',sans-serif; letter-spacing:-.02em; }
+    .dashboard-frame .text-muted { color:var(--dash-muted)!important; }
+    .dashboard-frame .card { background:var(--dash-panel); color:var(--dash-ink); border:1px solid var(--dash-line)!important; border-radius:12px!important; box-shadow:0 12px 32px -22px #000; }
+    .dashboard-frame .bg-light { background:var(--dash-panel)!important; }
+    .dashboard-frame .form-control,.dashboard-frame .form-select { background:var(--dash-panel-2); border-color:var(--dash-line); color:var(--dash-ink); }
+    .dashboard-frame .form-control:focus,.dashboard-frame .form-select:focus { border-color:var(--dash-flow); box-shadow:0 0 0 2px rgba(76,194,255,.18); }
+    .dashboard-title { display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; }
+    .dashboard-title h1 { margin:0; color:var(--dash-ink)!important; font-size:clamp(25px,3vw,35px); font-weight:900; }
+    .title-mark { width:10px; height:34px; border-radius:3px; background:var(--dash-flow); }
+    .dashboard-actions { margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .dashboard-actions .btn { border-radius:8px; font-weight:600; }
+    .dashboard-frame .kpi-card { min-height:145px; padding:20px!important; border-left:3px solid var(--dash-accent)!important; }
+    .dashboard-frame .kpi-card h6 { color:var(--dash-muted)!important; font-size:10px; letter-spacing:.08em; }
+    .dashboard-frame .kpi-card h3,.dashboard-frame .kpi-card h4 { color:var(--dash-accent)!important; font-family:'Chivo',sans-serif; font-weight:900; }
+    .dashboard-frame .kpi-card small { color:var(--dash-muted)!important; }
+    .insight-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
+    .insight { padding:14px 16px; border-left:3px solid var(--dash-accent)!important; }
+    .insight strong { display:block; font-family:'Chivo',sans-serif; margin-bottom:4px; }
+    .insight span { color:var(--dash-muted); font-size:12px; }
+    @media(max-width:800px) { .dashboard-frame { margin:-20px; padding:20px 14px 42px; } .insight-strip { grid-template-columns:1fr; } }
+</style>
+
+<div class="dashboard-frame">
+<div class="dashboard-title mb-4">
+    <span class="title-mark" aria-hidden="true"></span>
+    <div>
+        <h1>Centro de ciclo de ingreso</h1>
+        <p class="text-muted small mb-0 mt-2">Facturación, radicación, glosas y cartera · actualizado {{ fecha_actual }}</p>
+    </div>
+    <div class="dashboard-actions">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleTheme">Tema claro</button>
+        <button type="button" class="btn btn-outline-info btn-sm" id="refreshNow">Actualizar</button>
+    </div>
+</div>
+<div class="d-none">
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0 fw-bold" style="color: #4a6a8a;">
+        <img src="{% static 'images/logo_soft.png' %}" width="50" class="me-2"> Panel de Control
+    </h2>
+    <p class="text-muted small mb-0">Actualizado: {{ fecha_actual }}</p>
+</div>
+</div>
+
+<!-- FILTROS TEMPORALES -->
+<div class="card bg-light border-0 p-3 mb-4">
+    <form method="GET" class="row align-items-end g-2">
+        <div class="col-auto">
+            <label class="form-label small fw-bold mb-1">Año</label>
+            <select name="ano" class="form-select form-select-sm" style="width: 120px;">
+                <option value="">-- Todos --</option>
+                {% for ano in anos_disponibles %}
+                    <option value="{{ ano }}" {% if ano|stringformat:"s" == ano_filtro %}selected{% endif %}>
+                        {{ ano }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small fw-bold mb-1">Mes</label>
+            <select name="mes" id="filtroMes" class="form-select form-select-sm" style="width: 120px;">
+                <option value="">-- Todos --</option>
+                <option value="1" {% if mes_filtro == "1" %}selected{% endif %}>Enero</option>
+                <option value="2" {% if mes_filtro == "2" %}selected{% endif %}>Febrero</option>
+                <option value="3" {% if mes_filtro == "3" %}selected{% endif %}>Marzo</option>
+                <option value="4" {% if mes_filtro == "4" %}selected{% endif %}>Abril</option>
+                <option value="5" {% if mes_filtro == "5" %}selected{% endif %}>Mayo</option>
+                <option value="6" {% if mes_filtro == "6" %}selected{% endif %}>Junio</option>
+                <option value="7" {% if mes_filtro == "7" %}selected{% endif %}>Julio</option>
+                <option value="8" {% if mes_filtro == "8" %}selected{% endif %}>Agosto</option>
+                <option value="9" {% if mes_filtro == "9" %}selected{% endif %}>Septiembre</option>
+                <option value="10" {% if mes_filtro == "10" %}selected{% endif %}>Octubre</option>
+                <option value="11" {% if mes_filtro == "11" %}selected{% endif %}>Noviembre</option>
+                <option value="12" {% if mes_filtro == "12" %}selected{% endif %}>Diciembre</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small fw-bold mb-1">Tipo ERP</label>
+            <select name="tipo_erp" id="filtroTipoERP" class="form-select form-select-sm" style="width: 180px;">
+                <option value="">-- Todos --</option>
+                {% for tipo in tipos_erp %}
+                    <option value="{{ tipo }}" {% if tipo == tipo_erp %}selected{% endif %}>{{ tipo }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small fw-bold mb-1">ERP</label>
+            <input list="erpOptions" id="filtroNitERP" name="nit_erp" value="{{ nit_erp|default_if_none:'' }}" class="form-control form-control-sm" style="width: 210px;" placeholder="Por nombre o NIT">
+            <datalist id="erpOptions">
+                {% for erp in erps_disponibles %}
+                    <option value="{{ erp }}"></option>
+                {% endfor %}
+            </datalist>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small fw-bold mb-1">Admisión desde</label>
+            <input type="date" name="fecha_admision_desde" id="fechaAdmisionDesde" value="{{ fecha_admision_desde }}" class="form-control form-control-sm" style="width: 170px;">
+        </div>
+        <div class="col-auto">
+            <label class="form-label small fw-bold mb-1">Admisión hasta</label>
+            <input type="date" name="fecha_admision_hasta" id="fechaAdmisionHasta" value="{{ fecha_admision_hasta }}" class="form-control form-control-sm" style="width: 170px;">
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-sm btn-primary">🔍 Filtrar</button>
+            <a href="{% url 'home' %}" class="btn btn-sm btn-outline-secondary">Limpiar</a>
+        </div>
+    </form>
+    <div id="dashboardStatus" class="small text-muted mt-2" role="status">Los indicadores se actualizan con los filtros seleccionados.</div>
+</div>
+
+<div class="insight-strip">
+    <div class="card insight" style="--dash-accent:var(--dash-flow)"><strong>Radicación</strong><span>Lo facturado entra al circuito del pagador cuando queda radicado.</span></div>
+    <div class="card insight" style="--dash-accent:var(--dash-warn)"><strong>Glosas</strong><span>Una tasa alta pide revisar soportes antes de enviar la siguiente cuenta.</span></div>
+    <div class="card insight" style="--dash-accent:var(--dash-bad)"><strong>Edad de cartera</strong><span>Los saldos mayores a 360 días requieren conciliación prioritaria.</span></div>
+</div>
+
+<!-- KPIs PRINCIPALES -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card kpi-card" style="--dash-accent:var(--dash-flow)">
+            <h6 class="text-muted fw-bold text-uppercase small">💰 Valor Radicados</h6>
+            <h3 id="valorRadicados" class="fw-bold" style="color: #4a6a8a;">
+                ${{ valor_radicados }}
+            </h3>
+            <small id="totalFacturasRadicadas" class="text-muted">{{ total_facturas_radicadas }} facturas radicadas</small>
+            <hr class="my-3">
+            <h6 class="text-muted fw-bold text-uppercase small">📄 Valor Facturados</h6>
+            <h4 id="valorFacturados" class="fw-bold text-secondary">${{ valor_facturados }}</h4>
+            <small id="totalFacturasFacturadas" class="text-muted">{{ total_facturas_facturadas }} facturas facturadas</small>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card kpi-card" style="--dash-accent:var(--dash-flow)">
+            <h6 class="text-muted fw-bold text-uppercase small">📊 % Radicación</h6>
+            <h3 id="pctRadicacion" class="fw-bold text-primary">{{ pct_radicacion }}%</h3>
+            <small class="text-muted">Efectividad administrativa</small>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card kpi-card" style="--dash-accent:var(--dash-warn)">
+            <h6 class="text-muted fw-bold text-uppercase small">⚠️ % Glosa Inicial</h6>
+            <h3 id="pctGlosaInicial" class="fw-bold text-warning">{{ pct_glosa_inicial }}%</h3>
+            <small class="text-muted">Objeción inicial</small>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card kpi-card" style="--dash-accent:var(--dash-ok)">
+            <h6 class="text-muted fw-bold text-uppercase small">⏱️ DSO (Días)</h6>
+            <h3 id="dsoValor" class="fw-bold text-success">{{ dso }}</h3>
+            <small class="text-muted">Edad media de cartera</small>
+        </div>
+    </div>
+</div>
+
+<!-- GRÁFICOS -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0 p-4" style="border-radius: 15px;">
+            <h4 class="fw-bold mb-4" style="color: #4a6a8a;">
+                <i class="fas fa-history me-2"></i>Distribución de Cartera por Edades
+            </h4>
+            <div style="position: relative; height:300px;">
+                <canvas id="carteraChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 p-4" style="border-radius: 15px;">
+            <h5 class="fw-bold mb-3" style="color: #4a6a8a;">
+                <i class="fas fa-building me-2"></i>Top 5 ERPs · saldo pendiente
+            </h5>
+            <div class="list-group list-group-flush">
+                <div id="topErpsList">
+                {% for erp in top_erps %}
+                    <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                        <span class="small">{{ erp.nombre_erp }}</span>
+                        <strong class="text-primary">${{ erp.total|floatformat:0 }}</strong>
+                    </div>
+                {% empty %}
+                    <p class="text-muted small">Sin datos</p>
+                {% endfor %}
+            </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-7">
+        <div class="card shadow-sm border-0 p-4" style="border-radius: 15px;">
+            <h5 class="fw-bold mb-1" style="color: #4a6a8a;">Matriz de riesgo por ERP</h5>
+            <small class="text-muted">Cada punto combina rotación, glosa y saldo pendiente. Haz clic para filtrar.</small>
+            <div id="riskMatrix" class="mt-3" style="height:280px;position:relative;border-left:1px solid var(--dash-line);border-bottom:1px solid var(--dash-line);background:linear-gradient(90deg,transparent 49.8%,rgba(255,92,114,.12) 50%),linear-gradient(0deg,transparent 69.8%,rgba(255,92,114,.12) 70%);"><span class="text-muted small">Cargando matriz...</span></div>
+            <div class="d-flex justify-content-between text-muted small mt-2"><span>Menor rotación</span><span>Rotación DSO mayor →</span></div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card shadow-sm border-0 p-4" style="border-radius: 15px;">
+            <h5 class="fw-bold mb-1" style="color: #4a6a8a;">Tendencia de recaudo</h5>
+            <small class="text-muted">Recaudo real por mes a partir de eventos PAE.</small>
+            <div style="height:280px;position:relative"><canvas id="recaudoChart"></canvas><span id="recaudoEmpty" class="text-muted small position-absolute top-50 start-50 translate-middle">Cargando tendencia...</span></div>
+        </div>
+    </div>
+</div>
+
+<!-- INFORMACIÓN ADICIONAL -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 p-4" style="border-radius: 10px;">
+            <h5 class="fw-bold" style="color: #4a6a8a;">📋 Glosas Totales</h5>
+            <h3 class="text-warning fw-bold">${{ total_glosas }}</h3>
+            <small class="text-muted">Valor total glosado (inicial)</small>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 p-4" style="border-radius: 10px;">
+            <h5 class="fw-bold" style="color: #4a6a8a;">🔎 Lectura operativa</h5>
+            <div id="operationalAlerts"><small class="text-muted">Calculando alertas...</small></div>
+            <div class="input-group input-group-sm mt-3">
+                <input id="facturaLookup" class="form-control" placeholder="Número de factura" aria-label="Número de factura">
+                <button id="openFactura" class="btn btn-outline-primary" type="button">Detalle</button>
+            </div>
+            <a href="{% url 'lista_facturas' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm btn-outline-primary mt-3">Ver facturas filtradas</a>
+        </div>
+    </div>
+</div>
+
+<aside id="facturaDrawer" class="position-fixed top-0 end-0 h-100 bg-dark text-light shadow-lg p-4" style="display:none;width:min(440px,94vw);z-index:1050;overflow:auto" aria-hidden="true">
+    <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h5 mb-0" id="drawerTitle">Detalle de factura</h2><button type="button" class="btn btn-sm btn-outline-light" id="closeFactura" aria-label="Cerrar detalle">Cerrar</button></div>
+    <div id="drawerBody"><p class="text-white-50">Busca una factura para ver sus eventos.</p></div>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('carteraChart').getContext('2d');
+    const carteraChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+                labels: ['0-30 días', '31-60 días', '61-90 días', '91-180 días', '181-360 días', '+360 días'],
+            datasets: [{
+                label: 'Saldo en COP',
+                data: [{{ datos_grafico|join:', ' }}, 0, 0],
+                backgroundColor: ['#4cc2ff', '#4cc2ff', '#2fd3a5', '#f5a623', '#f5a623', '#ff5c72'],
+                borderRadius: 8,
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { 
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + (value / 1000000).toFixed(1) + 'M';
+                        }
+                    }
+                }
+            }
+        }
+    });
+    const recaudoChart = new Chart(document.getElementById('recaudoChart').getContext('2d'), {
+        type: 'line',
+        data: { labels: [], datasets: [{ label: 'Recaudado', data: [], borderColor: '#2fd3a5', backgroundColor: 'rgba(47,211,165,.12)', fill: true, tension: .3 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: value => formatMoney(value) } } } }
+    });
+
+    const inputs = [
+        document.querySelector('select[name="ano"]'),
+        document.getElementById('filtroMes'),
+        document.getElementById('filtroTipoERP'),
+        document.getElementById('filtroNitERP'),
+        document.getElementById('fechaAdmisionDesde'),
+        document.getElementById('fechaAdmisionHasta')
+    ].filter(Boolean);
+
+    function buildQuery() {
+        const params = new URLSearchParams();
+        const ano = document.querySelector('select[name="ano"]').value;
+        const mes = document.getElementById('filtroMes').value;
+        const tipoERP = document.getElementById('filtroTipoERP').value;
+        const nitERP = document.getElementById('filtroNitERP').value;
+        const nitERPValue = nitERP === 'None' ? '' : nitERP;
+        const desde = document.getElementById('fechaAdmisionDesde').value;
+        const hasta = document.getElementById('fechaAdmisionHasta').value;
+
+        if (ano) params.set('ano', ano);
+        if (mes) params.set('mes', mes);
+        if (tipoERP) params.set('tipo_erp', tipoERP);
+        if (nitERPValue) params.set('nit_erp', nitERPValue);
+        if (desde) params.set('fecha_admision_desde', desde);
+        if (hasta) params.set('fecha_admision_hasta', hasta);
+        return params.toString();
+    }
+
+    function formatMoney(value) {
+        return Number(value).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+    }
+
+    function formatDate(value) {
+        return value ? new Date(value).toLocaleDateString('es-CO') : '—';
+    }
+
+    function renderRiskMatrix(erps) {
+        const matrix = document.getElementById('riskMatrix');
+        if (!erps.length) {
+            matrix.innerHTML = '<span class="text-muted small">Sin ERP con cartera para este filtro.</span>';
+            return;
+        }
+        const maxDso = Math.max(360, ...erps.map(erp => Number(erp.dso || 0))) * 1.1;
+        const maxGlosa = Math.max(10, ...erps.map(erp => Number(erp.pct_glosa || 0))) * 1.1;
+        matrix.innerHTML = erps.map(erp => {
+            const x = Math.min(96, Number(erp.dso || 0) / maxDso * 100);
+            const y = Math.max(4, 96 - Number(erp.pct_glosa || 0) / maxGlosa * 92);
+            const color = Number(erp.riesgo || 0) > .6 ? '#ff5c72' : Number(erp.riesgo || 0) > .38 ? '#f5a623' : '#2fd3a5';
+            return `<button type="button" class="risk-point" title="${erp.nombre} · DSO ${erp.dso} · glosa ${Number(erp.pct_glosa || 0).toFixed(1)}%" data-erp="${erp.nombre.replaceAll('"', '&quot;')}" style="position:absolute;left:${x}%;top:${y}%;transform:translate(-50%,-50%);width:${Math.max(12,Math.min(30,8 + Math.sqrt(erp.saldo || 0) / 1000))}px;height:${Math.max(12,Math.min(30,8 + Math.sqrt(erp.saldo || 0) / 1000))}px;border:2px solid ${color};background:${color};opacity:.78;border-radius:50%;cursor:pointer"></button>`;
+        }).join('');
+        matrix.querySelectorAll('.risk-point').forEach(point => point.addEventListener('click', () => { document.getElementById('filtroNitERP').value = point.dataset.erp; refreshDashboard(); }));
+    }
+
+    let ultimoPulso = '';
+    async function comprobarPulso() {
+        const response = await fetch('/api/dashboard-pulse/');
+        if (!response.ok) return;
+        const pulso = await response.json();
+        const marca = `${pulso.ultimo_evento || ''}|${pulso.ultima_importacion || ''}|${pulso.facturas || ''}`;
+        if (ultimoPulso && marca !== ultimoPulso) refreshDashboard();
+        ultimoPulso = marca;
+    }
+
+    async function openFacturaDetail() {
+        const numero = document.getElementById('facturaLookup').value.trim();
+        if (!numero) return;
+        const drawer = document.getElementById('facturaDrawer');
+        const body = document.getElementById('drawerBody');
+        drawer.style.display = 'block'; drawer.setAttribute('aria-hidden', 'false'); body.innerHTML = '<p class="text-white-50">Consultando...</p>';
+        const response = await fetch(`/api/dashboard-factura/?numero=${encodeURIComponent(numero)}`);
+        if (!response.ok) { body.innerHTML = '<p class="text-warning">No se encontró esa factura.</p>'; return; }
+        const data = (await response.json()).factura;
+        document.getElementById('drawerTitle').textContent = `Factura ${data.numero}`;
+        body.innerHTML = `<div class="border-bottom border-secondary pb-3 mb-3"><div class="small text-white-50">ERP</div><strong>${data.erp || '—'}</strong><div class="small text-white-50 mt-2">Estado</div><strong>${data.estado}</strong></div><div class="row g-2 small"><div class="col-6">Facturado<br><strong>${formatMoney(data.facturado)}</strong></div><div class="col-6">Saldo<br><strong>${formatMoney(data.saldo)}</strong></div><div class="col-6">Glosa<br><strong>${formatMoney(data.glosa)}</strong></div><div class="col-6">Radicación<br><strong>${formatDate(data.fecha_radicacion)}</strong></div></div><h3 class="h6 mt-4">Eventos PAE</h3>${data.eventos.length ? data.eventos.map(evento => `<div class="border-top border-secondary py-2 small"><strong>${evento.tipo}</strong> · ${formatDate(evento.fecha)}<br>${formatMoney(evento.valor)}${evento.observacion ? ` · ${evento.observacion}` : ''}</div>`).join('') : '<p class="small text-white-50">Sin eventos registrados.</p>'}`;
+    }
+
+    async function refreshDashboard() {
+        const query = buildQuery();
+        document.getElementById('dashboardStatus').textContent = 'Actualizando indicadores...';
+        const response = await fetch(`/api/dashboard-data/?${query}`);
+        if (!response.ok) {
+            document.getElementById('dashboardStatus').textContent = 'No fue posible actualizar los indicadores.';
+            return;
+        }
+        const data = await response.json();
+        const kpi = data.kpis;
+        document.getElementById('valorRadicados').textContent = formatMoney(kpi.radicado);
+        document.getElementById('valorFacturados').textContent = formatMoney(kpi.facturado);
+        document.getElementById('totalFacturasRadicadas').textContent = `${kpi.radicadas} facturas radicadas`;
+        document.getElementById('totalFacturasFacturadas').textContent = `${kpi.facturas} facturas facturadas`;
+        document.getElementById('pctRadicacion').textContent = `${Number(kpi.pct_radicacion).toFixed(1)}%`;
+        document.getElementById('pctGlosaInicial').textContent = `${Number(kpi.pct_glosa).toFixed(1)}%`;
+        document.getElementById('dsoValor').textContent = `${Number(kpi.dso).toFixed(0)}`;
+        carteraChart.data.datasets[0].data = data.edades.map(item => item.saldo);
+        carteraChart.update();
+        renderRiskMatrix(data.erps);
+        recaudoChart.data.labels = data.serie.map(item => item.periodo);
+        recaudoChart.data.datasets[0].data = data.serie.map(item => item.recaudado || 0);
+        recaudoChart.update();
+        document.getElementById('recaudoEmpty').classList.toggle('d-none', data.serie.some(item => Number(item.recaudado || 0) > 0));
+
+        const topErpsContainer = document.getElementById('topErpsList');
+        topErpsContainer.innerHTML = data.erps.length ? data.erps.slice(0, 5).map(erp => `<div class="list-group-item px-0 py-2 d-flex justify-content-between dashboard-erp" data-erp="${erp.nombre.replaceAll('"', '&quot;')}"><span class="small">${erp.nombre}</span><strong class="text-primary">${formatMoney(erp.saldo)}</strong></div>`).join('') : '<p class="text-muted small">Sin datos</p>';
+        topErpsContainer.querySelectorAll('.dashboard-erp').forEach(item => item.addEventListener('click', () => { document.getElementById('filtroNitERP').value = item.dataset.erp; refreshDashboard(); }));
+
+        document.getElementById('operationalAlerts').innerHTML = data.alertas.length ? data.alertas.map(alerta => `<div class="small mb-2"><strong>${alerta.titulo}</strong><br><span class="text-muted">${alerta.detalle}</span></div>`).join('') : '<small class="text-muted">No hay alertas activas con este filtro.</small>';
+        document.getElementById('dashboardStatus').textContent = `Actualizado ${new Date(data.actualizado).toLocaleTimeString('es-CO')} · filtros aplicados sin recargar.`;
+        const viewLink = document.querySelector('a.btn-outline-primary');
+        if (viewLink) viewLink.href = `{% url 'lista_facturas' %}?${query}`;
+    }
+
+    let refreshTimeout;
+    inputs.forEach(input => {
+        input.addEventListener('change', () => {
+            clearTimeout(refreshTimeout);
+            refreshTimeout = setTimeout(refreshDashboard, 400);
+        });
+    });
+
+    const filterForm = document.querySelector('form.row.align-items-end') || document.querySelector('form');
+    if (filterForm) {
+        filterForm.addEventListener('submit', event => {
+            event.preventDefault();
+            refreshDashboard();
+        });
+    }
+
+    document.getElementById('refreshNow').addEventListener('click', refreshDashboard);
+    document.getElementById('openFactura').addEventListener('click', openFacturaDetail);
+    document.getElementById('facturaLookup').addEventListener('keydown', event => { if (event.key === 'Enter') openFacturaDetail(); });
+    document.getElementById('closeFactura').addEventListener('click', () => { const drawer=document.getElementById('facturaDrawer'); drawer.style.display='none'; drawer.setAttribute('aria-hidden','true'); });
+    document.getElementById('toggleTheme').addEventListener('click', event => {
+        const light = document.documentElement.dataset.dashboardTheme === 'light';
+        document.documentElement.dataset.dashboardTheme = light ? 'dark' : 'light';
+        const values = light
+            ? ['#0e1a26', '#152838', '#1b3143', '#24405a', '#e9f1f8', '#8ca6be']
+            : ['#eef2f6', '#ffffff', '#f5f8fb', '#dce5ee', '#12222f', '#5b7386'];
+        ['--dash-bg','--dash-panel','--dash-panel-2','--dash-line','--dash-ink','--dash-muted'].forEach((name, index) => document.documentElement.style.setProperty(name, values[index]));
+        event.currentTarget.textContent = light ? 'Tema claro' : 'Tema oscuro';
+        localStorage.setItem('clinicsoft-dashboard-theme', light ? 'dark' : 'light');
+    });
+    if (localStorage.getItem('clinicsoft-dashboard-theme') === 'light') document.getElementById('toggleTheme').click();
+    refreshDashboard();
+    comprobarPulso();
+    window.setInterval(comprobarPulso, 20000);
+</script>
+</div>
+{% endblock %}

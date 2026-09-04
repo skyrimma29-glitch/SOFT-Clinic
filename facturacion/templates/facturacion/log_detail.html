@@ -1,0 +1,69 @@
+{% extends 'facturacion/base.html' %}
+
+{% block content %}
+<div style="max-width: 1000px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold">Detalle del Log</h3>
+            <p class="text-muted small mb-0">Visualiza el resumen y los detalles organizados del registro de importación.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'import_logs' %}" class="btn btn-outline-secondary">← Volver a Logs</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 p-4 mb-4">
+        <div class="row g-3">
+            <div class="col-md-8">
+                <h5 class="mb-2">{{ log.codigo }}</h5>
+                <p class="mb-1"><strong>Tipo:</strong> {{ log.tipo }}</p>
+                <p class="mb-1"><strong>Creado:</strong> {{ log.creado_en|date:'d/m/Y H:i' }}</p>
+                <p class="mb-1"><strong>Descripción:</strong> {{ log.descripcion|default:'Sin descripción' }}</p>
+            </div>
+            <div class="col-md-4">
+                <div class="border rounded-3 p-3 bg-light">
+                    <p class="text-uppercase small text-secondary mb-2">Resumen rápido</p>
+                    <p class="mb-1"><strong>Entradas:</strong> {{ log.detalles|length }}</p>
+                    <p class="mb-1"><strong>Campos resumen:</strong> {{ log.resumen|length }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 p-4 h-100">
+                <h5 class="fw-bold mb-3">Resumen</h5>
+                {% if log.resumen %}
+                <div class="list-group list-group-flush">
+                    {% for key, value in log.resumen.items %}
+                    <div class="list-group-item px-0 py-2">
+                        <div class="d-flex justify-content-between gap-3">
+                            <span class="text-secondary">{{ key|cut:"_"|capfirst }}:</span>
+                            <span class="fw-medium text-end">{{ value }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted small">No hay resumen disponible para este log.</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 p-4 h-100">
+                <h5 class="fw-bold mb-3">Detalles</h5>
+                {% if log.detalles %}
+                <ul class="list-group list-group-flush">
+                    {% for detalle in log.detalles %}
+                    <li class="list-group-item py-2">{{ detalle }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted small">No hay detalles registrados para este log.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

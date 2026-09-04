@@ -1,0 +1,374 @@
+{% extends 'facturacion/base.html' %}
+
+{% block content %}
+<div style="max-width: 700px;">
+    <!-- NAV TABS -->
+    <ul class="nav nav-tabs mb-4" id="cargaTabNav" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if active_tab|default:'dif' == 'dif' %}active{% endif %}" id="dif-tab" data-bs-toggle="tab" data-bs-target="#dif-content" type="button">
+                📊 Cargar DIF (Inicial)
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if active_tab|default:'dif' == 'pae' %}active{% endif %}" id="pae-tab" data-bs-toggle="tab" data-bs-target="#pae-content" type="button">
+                📝 Actualizar PAE (Eventos)
+            </button>
+        </li>
+    </ul>
+
+    <!-- TAB CONTENT -->
+    <div class="tab-content" id="cargaTabContent">
+        
+        <!-- DIF TAB -->
+        <div class="tab-pane fade {% if active_tab == 'dif' %}show active{% endif %}" id="dif-content" role="tabpanel">
+            <div class="card card-custom bg-white p-5">
+                <h4 class="mb-4">🗂️ Plantilla DIF - Datos Iniciales de Facturación</h4>
+                <p class="text-muted small mb-4">Carga el archivo base con información de facturas, pacientes y montos iniciales.</p>
+                
+                <form method="post" action="{% url 'subir_cartera' %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+
+                    <div class="alert alert-secondary small mb-3">
+                        El régimen se fija automáticamente en <strong>Por Clasificar</strong> para esta carga DIF.
+                    </div>
+
+                    <!-- File Input -->
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Archivo Excel (.xlsx o .xls)</strong></label>
+                        <input type="file" name="archivo_dif" class="form-control" accept=".xlsx, .xls" required>
+                        <small class="text-muted">Debe contener columnas: NFactura, Paciente, ERP, Valores Monetarios.</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100" data-processing-label="Procesando DIF..." data-success-message="Procesado correctamente: DIF cargado.">
+                        ✅ Procesar DIF
+                    </button>
+                </form>
+
+                <!-- Info de campos requeridos -->
+                <div class="alert alert-info mt-4 small">
+                    <strong>Campos obligatorios esperados:</strong><br>
+                    • NFactura (Número de factura) • Paciente • ERP/Entidad • Fecha Factura • Total/Valor
+                </div>
+            </div>
+        </div>
+
+        <!-- PAE TAB -->
+        <div class="tab-pane fade {% if active_tab == 'pae' %}show active{% endif %}" id="pae-content" role="tabpanel">
+            <div class="card card-custom bg-white p-5">
+                <h4 class="mb-4">📋 Plantilla PAE - Actualización de Eventos</h4>
+                <p class="text-muted small mb-4">Carga eventos: Glosas, Pagos/Abonos, Devoluciones, Retenciones.</p>
+
+                <form method="post" action="{% url 'actualizar_pae' %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+
+                    <!-- File Input -->
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Archivo Excel (.xlsx o .xls)</strong></label>
+                        <input type="file" name="archivo_pae" class="form-control" accept=".xlsx, .xls" required>
+                        <small class="text-muted">Debe contener información de glosas, abonos y retenciones.</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100" data-processing-label="Procesando PAE..." data-success-message="Procesado correctamente: PAE actualizado.">
+                        ✅ Procesar PAE
+                    </button>
+                </form>
+
+                <!-- Info de campos esperados -->
+                <div class="alert alert-info mt-4 small">
+                    <strong>Campos esperados:</strong><br>
+                    • NFactura • Vlr_Glosa_Inicial • Vlr_Aceptado_IPS • Vlr_Levantado_ERP<br>
+                    • Fecha_P_1, Vlr_P_1 (Abono 1) • Fecha_P_2, Vlr_P_2 (Abono 2) ... hasta P_4<br>
+                    • Vlr_RTF_Total (Retención) • Fecha_Devolucion
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MENSAJES DE ESTADO -->
+    {% if messages %}
+    <div class="mt-4">
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}success{% endif %} alert-dismissible fade show">
+                <strong>{{ message }}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- RESUMEN DE IMPORTACIÓN OPCIONAL -->
+    {% if resumen_importacion %}
+    <div class="card card-custom bg-white p-4 mt-4">
+        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-3">
+            <div>
+                <h5 class="fw-bold mb-1">📌 Resumen de importación</h5>
+                <p class="text-muted small mb-0">Resultados rápidos del archivo cargado y las acciones aplicadas.</p>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                <span class="badge bg-primary text-white">{{ resumen_importacion.tipo }}</span>
+                <button id="limpiarLogsBtn" class="btn btn-sm btn-outline-danger">Limpiar logs</button>
+            </div>
+        </div>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <strong>Filas en Excel</strong>
+                    <p class="mb-0 fs-5 fw-semibold">{{ resumen_importacion.filas_en_excel }}</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <strong>Filas procesadas</strong>
+                    <p class="mb-0 fs-5 fw-semibold">{{ resumen_importacion.filas_procesadas }}</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <strong>Actualizadas</strong>
+                    <p class="mb-0 fs-5 fw-semibold">{{ resumen_importacion.actualizadas }}</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <strong>Creadas</strong>
+                    <p class="mb-0 fs-5 fw-semibold">{{ resumen_importacion.creadas }}</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <strong>Omitidas</strong>
+                    <p class="mb-0 fs-5 fw-semibold">{{ resumen_importacion.filas_omitidas }}</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <strong>Advertencias</strong>
+                    <p class="mb-0 fs-5 fw-semibold">{{ resumen_importacion.alertas_aritmeticas|length }}</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <strong>Errores detectados</strong>
+                    <p class="mb-0 fs-5 fw-semibold">{{ resumen_importacion.errores|length }}</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <strong>Filas duplicadas</strong>
+                    <p class="mb-0 fs-5 fw-semibold">{{ resumen_importacion.filas_duplicadas }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="mt-3 rounded-3 px-3 py-3 bg-white border shadow-sm">
+            <p class="mb-0 small text-muted">Las discrepancias suaves no detienen el proceso. Revise las advertencias y errores listados a continuación para confirmar el estado final de la importación.</p>
+        </div>
+
+        {% if resumen_importacion.alertas_aritmeticas %}
+        <div class="mt-4">
+            <h6 class="fw-bold">Detalles de alertas</h6>
+            <ul class="list-group list-group-flush">
+                {% for alerta in resumen_importacion.alertas_aritmeticas|slice:":5" %}
+                    <li class="list-group-item py-2">{{ alerta }}</li>
+                {% endfor %}
+            </ul>
+            {% if resumen_importacion.alertas_aritmeticas|length > 5 %}
+                <p class="small text-muted mt-2">Mostrando 5 de {{ resumen_importacion.alertas_aritmeticas|length }} alertas.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if resumen_importacion.duplicados %}
+        <div class="mt-4">
+            <h6 class="fw-bold">Detalles de duplicados</h6>
+            <ul class="list-group list-group-flush">
+                {% for duplicado in resumen_importacion.duplicados|slice:":5" %}
+                    <li class="list-group-item py-2">{{ duplicado }}</li>
+                {% endfor %}
+            </ul>
+            {% if resumen_importacion.duplicados|length > 5 %}
+                <p class="small text-muted mt-2">Mostrando 5 de {{ resumen_importacion.duplicados|length }} duplicados.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if resumen_importacion.errores %}
+        <div class="mt-4">
+            <h6 class="fw-bold text-danger">Errores</h6>
+            <ul class="list-group list-group-flush">
+                {% for error in resumen_importacion.errores|slice:":5" %}
+                    <li class="list-group-item py-2 text-danger">{{ error }}</li>
+                {% endfor %}
+            </ul>
+            {% if resumen_importacion.errores|length > 5 %}
+                <p class="small text-muted mt-2">Mostrando 5 de {{ resumen_importacion.errores|length }} errores.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if resumen_importacion.log_codigo %}
+        <div class="mt-4">
+            <div class="alert alert-info py-3">
+                <strong>Código de log:</strong> {{ resumen_importacion.log_codigo }}<br>
+                <small>Visita <a href="{% url 'import_logs' %}">Logs de importación</a> para ver el detalle completo.</small>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if pae_audit_log %}
+        <div class="mt-4">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                <h6 class="fw-bold mb-0">🧾 Bitácora PAE</h6>
+                <span class="badge bg-secondary-subtle text-secondary-emphasis">Factura + estado</span>
+            </div>
+            <p class="small text-muted mb-3">Cada fila queda registrada con la factura asociada, el estado del procesamiento y el detalle del resultado.</p>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Fila</th>
+                            <th>Factura</th>
+                            <th>Estado</th>
+                            <th>Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entrada in pae_audit_log %}
+                        <tr>
+                            <td>{{ entrada.fila }}</td>
+                            <td><strong>{{ entrada.factura }}</strong></td>
+                            <td>
+                                {% if entrada.estado == 'procesada' %}
+                                    <span class="badge bg-success-subtle text-success-emphasis">Procesada</span>
+                                {% elif entrada.estado == 'omitida' %}
+                                    <span class="badge bg-warning-subtle text-warning-emphasis">Omitida</span>
+                                {% else %}
+                                    <span class="badge bg-danger-subtle text-danger-emphasis">Error</span>
+                                {% endif %}
+                            </td>
+                            <td class="small">{{ entrada.detalle }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+</div>
+
+<style>
+    .card-custom {
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .nav-tabs .nav-link {
+        color: #666;
+        font-weight: 500;
+        border-bottom: 2px solid #eee;
+    }
+    .nav-tabs .nav-link.active {
+        color: #4a6a8a;
+        border-bottom-color: #4a6a8a;
+        background: transparent;
+    }
+</style>
+{% endblock %}
+{% if resumen_importacion and resumen_importacion.duplicados_pendientes %}
+<!-- Modal para resolver duplicados -->
+<div class="modal fade" id="duplicadosModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Duplicados detectados — Selecciona la acción</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Se detectaron facturas duplicadas. Elige para cada caso cuál factura debe importarse. La otra será omitida y registrada en el log.</p>
+
+                <form id="duplicadosForm">
+                    <div class="list-group">
+                        {% for d in resumen_importacion.duplicados_pendientes %}
+                        <div class="list-group-item">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <strong>{{ d.num_factura }}</strong>
+                                    <div class="small text-muted">Fila Excel: {{ d.fila_excel }} — Importado: {{ d.total_importado_raw }} | Fecha: {{ d.fecha_importada }}</div>
+                                    <div class="small text-muted">Existente: {{ d.factura_existente_num }} — Total: {{ d.factura_existente_total }} | Fecha: {{ d.factura_existente_fecha }}</div>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <div class="btn-group" role="group" aria-label="Acciones">
+                                        <input type="radio" class="btn-check" name="res_{{ d.fila_idx }}" id="res_existing_{{ d.fila_idx }}" value="existing" checked>
+                                        <label class="btn btn-outline-primary btn-sm" for="res_existing_{{ d.fila_idx }}">Usar existente</label>
+
+                                        <input type="radio" class="btn-check" name="res_{{ d.fila_idx }}" id="res_incoming_{{ d.fila_idx }}" value="incoming">
+                                        <label class="btn btn-outline-success btn-sm" for="res_incoming_{{ d.fila_idx }}">Usar fila importada</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="procesarDuplicadosBtn" class="btn btn-primary">Procesar selecciones</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    var duplicados = JSON.parse('{{ resumen_importacion.duplicados_pendientes_json|default:'[]'|escapejs }}');
+    if (duplicados && duplicados.length > 0) {
+        var modal = new bootstrap.Modal(document.getElementById('duplicadosModal'));
+        modal.show();
+
+            document.getElementById('procesarDuplicadosBtn').addEventListener('click', function(){
+            var form = document.getElementById('duplicadosForm');
+            var resoluciones = {};
+            duplicados.forEach(function(d){
+                var name = 'res_' + d.fila_idx;
+                var els = form.querySelectorAll('[name="'+name+'"]');
+                var val = 'existing';
+                els.forEach(function(el){ if (el.checked) val = el.value; });
+                resoluciones[d.fila_idx] = val;
+            });
+
+            function getCookie(name) {
+                var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+                return v ? v[2] : null;
+            }
+            var csrftoken = getCookie('csrftoken');
+
+            fetch('{% url "resolver_duplicados_dif" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ resoluciones: resoluciones })
+            }).then(r=>r.json()).then(resp=>{
+                if (resp.error){ alert('Error: '+resp.error); return; }
+                // Recargar la página para mostrar el resumen final
+                location.reload();
+            }).catch(err=>{ alert('Error en la solicitud: '+err); });
+        });
+    }
+    // Limpiar logs handler
+    var limpiarBtn = document.getElementById('limpiarLogsBtn');
+    if (limpiarBtn){
+        limpiarBtn.addEventListener('click', function(){
+            if (!confirm('¿Seguro que quieres borrar los logs de importación?')) return;
+            function getCookie(name) { var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)'); return v ? v[2] : null; }
+            var csrftoken = getCookie('csrftoken');
+            fetch('{% url "limpiar_import_logs" %}', { method: 'POST', headers: { 'X-CSRFToken': csrftoken } })
+            .then(r=>r.json()).then(j=>{ if (j.ok){ alert(j.mensaje || 'Los logs de importación se borraron correctamente.'); location.reload(); } else { alert('Error: '+(j.error||'falló')); } })
+            .catch(e=>{ alert('Error: '+e); });
+        });
+    }
+});
+</script>
+{% endif %}

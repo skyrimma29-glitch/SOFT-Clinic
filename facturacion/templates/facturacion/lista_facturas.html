@@ -1,0 +1,732 @@
+{% extends 'facturacion/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <h2 class="mb-1">Gestión de Cartera</h2>
+        <p class="text-muted mb-0">Consulta rápida, filtros avanzados y detalle de cada factura.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#filtrosFacturaModal">Filtros</button>
+        <a href="{% url 'exportar_eas' %}" class="btn btn-success" data-export-process="Exportando EAS..." data-success-message="Procesado correctamente: EAS exportado.">Exportar EAS</a>
+        <a href="{% url 'exportar_eas_seleccionadas' %}" id="exportar-seleccionadas" class="btn btn-outline-success" data-export-process="Exportando seleccionadas..." data-success-message="Facturas seleccionadas exportadas correctamente.">Exportar seleccionadas</a>
+        <a href="{% url 'subir_cartera' %}" class="btn btn-primary">+ Cargar Nuevo Excel</a>
+    </div>
+</div>
+
+<div class="modal fade" id="filtrosFacturaModal" tabindex="-1" aria-labelledby="filtrosFacturaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-dark text-white">
+        <div>
+          <h5 class="modal-title mb-1" id="filtrosFacturaLabel">Filtros avanzados</h5>
+          <p class="small text-white-50 mb-0">Filtra por fechas, estado, valor neto y entidad.</p>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body p-4">
+        <form method="get" action="{% url 'lista_facturas' %}" class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Búsqueda rápida</label>
+            <input type="text" class="form-control" name="q" value="{{ query|default:'' }}" placeholder="Factura, atención, entidad o paciente">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Fecha de admisión desde</label>
+            <input type="date" class="form-control" name="fecha_admision_desde" value="{{ fecha_admision_desde|default:'' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Fecha de admisión hasta</label>
+            <input type="date" class="form-control" name="fecha_admision_hasta" value="{{ fecha_admision_hasta|default:'' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Fecha de radicación desde</label>
+            <input type="date" class="form-control" name="fecha_radicacion_desde" value="{{ fecha_radicacion_desde|default:'' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Fecha de radicación hasta</label>
+            <input type="date" class="form-control" name="fecha_radicacion_hasta" value="{{ fecha_radicacion_hasta|default:'' }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Estado</label>
+            <div class="d-flex flex-wrap gap-2">
+              <label class="form-check form-check-inline border rounded-pill px-3 py-2 mb-0"><input class="form-check-input" type="checkbox" name="solo_radicadas" value="1" {% if solo_radicadas %}checked{% endif %}> Con radicación</label>
+              <label class="form-check form-check-inline border rounded-pill px-3 py-2 mb-0"><input class="form-check-input" type="checkbox" name="sin_radicacion" value="1" {% if sin_radicacion %}checked{% endif %}> Sin radicación</label>
+              <label class="form-check form-check-inline border rounded-pill px-3 py-2 mb-0"><input class="form-check-input" type="checkbox" name="solo_facturadas" value="1" {% if solo_facturadas %}checked{% endif %}> Facturado</label>
+              <label class="form-check form-check-inline border rounded-pill px-3 py-2 mb-0"><input class="form-check-input" type="checkbox" name="sin_factura" value="1" {% if sin_factura %}checked{% endif %}> No facturado</label>
+              <label class="form-check form-check-inline border rounded-pill px-3 py-2 mb-0"><input class="form-check-input" type="checkbox" name="solo_valor_neto_cero" value="1" {% if solo_valor_neto_cero %}checked{% endif %}> Valor neto = 0</label>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Rango de valor neto</label>
+            <div class="row g-2 align-items-center">
+              <div class="col-6">
+                <input type="number" class="form-control" name="valor_neto_min" value="{{ valor_neto_min|default:'' }}" placeholder="Mínimo">
+              </div>
+              <div class="col-6">
+                <input type="number" class="form-control" name="valor_neto_max" value="{{ valor_neto_max|default:'' }}" placeholder="Máximo">
+              </div>
+            </div>
+            <small class="text-muted">Rango aplicado sobre Valor Neto = Valor Bruto - Pagos reales (aceptado IPS + abonos + RTF).</small>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Entidad / ERP</label>
+            <select class="form-select" name="entidad">
+              <option value="">Todas</option>
+              {% for nombre in entidades_disponibles %}
+                <option value="{{ nombre }}" {% if entidad == nombre %}selected{% endif %}>{{ nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 d-flex justify-content-between gap-2 pt-2 border-top">
+            <a href="{% url 'lista_facturas' %}" class="btn btn-outline-secondary">Limpiar</a>
+            <button type="submit" class="btn btn-primary">Aplicar filtros</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<form method="GET" class="mb-4 row g-2 align-items-end">
+    <input type="hidden" name="fecha_admision_desde" value="{{ fecha_admision_desde|default:'' }}">
+    <input type="hidden" name="fecha_admision_hasta" value="{{ fecha_admision_hasta|default:'' }}">
+    <input type="hidden" name="fecha_radicacion_desde" value="{{ fecha_radicacion_desde|default:'' }}">
+    <input type="hidden" name="fecha_radicacion_hasta" value="{{ fecha_radicacion_hasta|default:'' }}">
+    <input type="hidden" name="solo_radicadas" value="{% if solo_radicadas %}1{% endif %}">
+    <input type="hidden" name="sin_radicacion" value="{% if sin_radicacion %}1{% endif %}">
+    <input type="hidden" name="solo_facturadas" value="{% if solo_facturadas %}1{% endif %}">
+    <input type="hidden" name="sin_factura" value="{% if sin_factura %}1{% endif %}">
+    <input type="hidden" name="solo_valor_neto_cero" value="{% if solo_valor_neto_cero %}1{% endif %}">
+    <input type="hidden" name="valor_neto_min" value="{{ valor_neto_min|default:'' }}">
+    <input type="hidden" name="valor_neto_max" value="{{ valor_neto_max|default:'' }}">
+    <input type="hidden" name="entidad" value="{{ entidad|default:'' }}">
+    <div class="col-auto flex-grow-1">
+        <label class="form-label small text-secondary">Buscar</label>
+        <input type="text" name="q" class="form-control" placeholder="Factura, atención o entidad..." value="{{ query|default:'' }}">
+    </div>
+    <div class="col-auto">
+        <label class="form-label small text-secondary">Admisión desde</label>
+        <input type="date" name="fecha_admision_desde" class="form-control" value="{{ fecha_admision_desde|default:'' }}">
+    </div>
+    <div class="col-auto">
+        <label class="form-label small text-secondary">Admisión hasta</label>
+        <input type="date" name="fecha_admision_hasta" class="form-control" value="{{ fecha_admision_hasta|default:'' }}">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-secondary">Filtrar</button>
+        {% if query or fecha_admision_desde or fecha_admision_hasta %}
+            <a href="{% url 'lista_facturas' %}" class="btn btn-outline-danger">Limpiar</a>
+        {% endif %}
+    </div>
+</form>
+
+<form method="POST" id="bulk-delete-form">
+    {% csrf_token %}
+    <input type="hidden" name="q" value="{{ query|default:'' }}">
+    <input type="hidden" name="fecha_admision_desde" value="{{ fecha_admision_desde|default:'' }}">
+    <input type="hidden" name="fecha_admision_hasta" value="{{ fecha_admision_hasta|default:'' }}">
+    <input type="hidden" name="fecha_radicacion_desde" value="{{ fecha_radicacion_desde|default:'' }}">
+    <input type="hidden" name="fecha_radicacion_hasta" value="{{ fecha_radicacion_hasta|default:'' }}">
+    <input type="hidden" name="solo_radicadas" value="{% if solo_radicadas %}1{% endif %}">
+    <input type="hidden" name="sin_radicacion" value="{% if sin_radicacion %}1{% endif %}">
+    <input type="hidden" name="solo_facturadas" value="{% if solo_facturadas %}1{% endif %}">
+    <input type="hidden" name="sin_factura" value="{% if sin_factura %}1{% endif %}">
+    <input type="hidden" name="solo_valor_neto_cero" value="{% if solo_valor_neto_cero %}1{% endif %}">
+    <input type="hidden" name="valor_neto_min" value="{{ valor_neto_min|default:'' }}">
+    <input type="hidden" name="valor_neto_max" value="{{ valor_neto_max|default:'' }}">
+    <input type="hidden" name="entidad" value="{{ entidad|default:'' }}">
+    <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
+        <button type="submit" class="btn btn-danger">Eliminar facturas seleccionadas</button>
+        <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" id="selectAll">
+            <label class="form-check-label" for="selectAll">Seleccionar todo</label>
+        </div>
+    </div>
+
+    <div class="card card-custom bg-white">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-center">Sel.</th>
+                    <th>Factura</th>
+                    <th>Id Atención</th>
+                    <th>F. Admisión</th>
+                    <th>Entidad (ERP)</th>
+                    <th>Radicación</th>
+                    <th>Valor Neto</th>
+                    <th>Días</th>
+                    <th>Rango Mora</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for factura in page_obj %}
+                <tr>
+                    <td class="text-center align-middle"><input class="form-check-input select-factura" type="checkbox" name="factura_ids" value="{{ factura.id }}"></td>
+                    <td>
+                        <strong>{{ factura.num_factura }}</strong>
+                        <button type="button"
+                                class="btn btn-link btn-sm p-0 ms-2 text-primary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#detalleFacturaModal"
+                                data-factura-id="{{ factura.id }}"
+                                data-num-factura="{{ factura.num_factura }}"
+                                data-paciente="{{ factura.nombre_paciente|default:'Sin nombre' }}"
+                                data-entidad="{{ factura.erp.nombre }}"
+                                data-valor-bruto="{{ factura.total_factura|floatformat:2 }}"
+                                data-copagos="{{ factura.copago|floatformat:2 }}"
+                                data-pagos="{{ factura.pagos_total|floatformat:2 }}"
+                                data-valor-neto="{{ factura.valor_neto|floatformat:2 }}"
+                                data-saldo="{{ factura.saldo_actual|floatformat:2 }}"
+                                data-edad="{{ factura.edad_cartera }}"
+                                data-glosa="{{ factura.estado_glosa }}"
+                                data-fecha-radicacion="{{ factura.fecha_radicacion_inicial|date:'d/m/Y' }}"
+                                data-fecha-factura="{{ factura.fecha_factura|date:'d/m/Y' }}"
+                                data-fecha-importacion="{{ factura.fecha_importacion|date:'d/m/Y H:i' }}"
+                                data-campos-actualizados="{{ factura.campos_actualizados }}"
+                                data-pae-cambios-preview="{{ factura.pae_cambios_preview|default:'Sin cambios aplicados' }}"
+                                data-pae-cambios='{{ factura.pae_cambios_json|escapejs }}'
+                                data-canal="{{ factura.nom_canal|default:'—' }}"
+                                data-identificacion="{{ factura.historia_clinica|default:'—' }}"
+                                data-celular="{{ factura.tel_celular|default:'—' }}"
+                                data-abonos='{{ factura.abonos_pae_json|escapejs }}'
+                                data-total-abonos="{{ factura.pae_datos_origen.raw_row.vlr_total_abonos|default:'0' }}"
+                                data-rtf="{{ factura.rtf_pae|floatformat:2 }}"
+                                data-estado-gestion="{{ factura.estado_gestion }}"
+                                data-fuente-datos="{{ factura.fuente_datos }}"
+                                data-eventos-pae="{{ factura.eventos.count }}">
+                            Ver detalle
+                        </button>
+                    </td>
+                    <td>{{ factura.id_atencion }}</td>
+                    <td>{{ factura.fecha_admision|date:"d/m/y" }}</td>
+                    <td>{{ factura.erp.nombre }}</td>
+                    <td>{{ factura.fecha_radicacion_inicial|date:"d/m/y" }}</td>
+                    <td>${{ factura.valor_neto|floatformat:2 }}</td>
+                    <td>{{ factura.dias_vencimiento }}</td>
+                    <td>
+                        {% if factura.dias_vencimiento > 90 %}
+                            <span class="badge bg-danger">{{ factura.rango_mora }}</span>
+                        {% elif factura.dias_vencimiento > 30 %}
+                            <span class="badge bg-warning text-dark">{{ factura.rango_mora }}</span>
+                        {% else %}
+                            <span class="badge bg-success">{{ factura.rango_mora }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">No hay facturas cargadas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<nav aria-label="Navegación de facturas" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?{% if query_string %}{{ query_string }}&{% endif %}page=1">« Primero</a></li>
+            <li class="page-item"><a class="page-link" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a></li>
+        {% endif %}
+
+        <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+
+        {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.next_page_number }}">Siguiente</a></li>
+            <li class="page-item"><a class="page-link" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Último »</a></li>
+        {% endif %}
+    </ul>
+</nav>
+</form>
+
+<style>
+  .field-editor-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 32px;
+  }
+  .field-editor-inline .field-editor-trigger,
+  .field-editor-inline .field-editor-confirm,
+  .field-editor-inline .field-editor-cancel {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.15s ease, visibility 0.15s ease, transform 0.15s ease;
+    text-decoration: none;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 0.15rem 0.35rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.35rem;
+  }
+  .field-editor-inline:hover .field-editor-trigger,
+  .field-editor-inline.is-editing .field-editor-confirm,
+  .field-editor-inline.is-editing .field-editor-cancel,
+  .field-editor-inline.is-editing .field-editor-trigger {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .field-editor-inline .field-editor-trigger {
+    color: #111827;
+    font-size: 0.9rem;
+  }
+  .field-editor-inline .field-editor-confirm {
+    color: #198754;
+    font-size: 1rem;
+    background: rgba(25, 135, 84, 0.08);
+  }
+  .field-editor-inline .field-editor-cancel {
+    color: #dc3545;
+    font-size: 1rem;
+    background: rgba(220, 53, 69, 0.08);
+  }
+  .field-editor-inline .field-editor-trigger:hover,
+  .field-editor-inline .field-editor-confirm:hover,
+  .field-editor-inline .field-editor-cancel:hover {
+    text-decoration: none;
+  }
+  .field-editor-inline .editable-value {
+    display: inline-block;
+    min-height: 1.5rem;
+  }
+  .field-editor-inline.is-editing .field-editor-trigger {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+</style>
+
+<div class="modal fade" id="detalleFacturaModal" tabindex="-1" aria-labelledby="detalleFacturaModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header text-white" style="background: linear-gradient(135deg, #0f172a, #1d4ed8); border-bottom: 0;">
+        <div>
+          <p class="small text-white-50 mb-1 text-uppercase tracking-wide">Detalle de factura</p>
+          <h5 class="modal-title mb-1" id="detalleFacturaModalLabel">Factura <span id="modal-num-factura"></span></h5>
+          <p class="small text-white-50 mb-0">Vista consolidada de la línea DIF con el cruce PAE cuando aplica.</p>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body p-4 bg-light-subtle">
+        <div class="row g-3">
+          <div class="col-md-8">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                  <div>
+                    <h6 class="fw-semibold mb-1">Resumen clínico y comercial</h6>
+                    <p class="text-muted small mb-0">Información base y estado operativo de la factura.</p>
+                  </div>
+                  <span id="badge-fuente-datos" class="badge rounded-pill bg-primary-subtle text-primary-emphasis"></span>
+                </div>
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <span class="text-muted small d-block">Paciente</span>
+                    <div class="field-editor-inline">
+                      <strong id="modal-paciente" class="editable-value"></strong>
+                      <button type="button" class="field-editor-trigger" data-field-editor="modal-paciente" title="Editar paciente" aria-label="Editar paciente">✎</button>
+                      <button type="button" class="field-editor-confirm" data-field-action="confirm" title="Confirmar cambio" aria-label="Confirmar cambio">✓</button>
+                      <button type="button" class="field-editor-cancel" data-field-action="cancel" title="Cancelar cambio" aria-label="Cancelar cambio">✕</button>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <span class="text-muted small d-block">Número de identificación</span>
+                    <div class="field-editor-inline">
+                      <strong id="modal-identificacion" class="editable-value"></strong>
+                      <button type="button" class="field-editor-trigger" data-field-editor="modal-identificacion" title="Editar identificación" aria-label="Editar identificación">✎</button>
+                      <button type="button" class="field-editor-confirm" data-field-action="confirm" title="Confirmar cambio" aria-label="Confirmar cambio">✓</button>
+                      <button type="button" class="field-editor-cancel" data-field-action="cancel" title="Cancelar cambio" aria-label="Cancelar cambio">✕</button>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <span class="text-muted small d-block">Celular</span>
+                    <div class="field-editor-inline">
+                      <strong id="modal-celular" class="editable-value"></strong>
+                      <button type="button" class="field-editor-trigger" data-field-editor="modal-celular" title="Editar celular" aria-label="Editar celular">✎</button>
+                      <button type="button" class="field-editor-confirm" data-field-action="confirm" title="Confirmar cambio" aria-label="Confirmar cambio">✓</button>
+                      <button type="button" class="field-editor-cancel" data-field-action="cancel" title="Cancelar cambio" aria-label="Cancelar cambio">✕</button>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <span class="text-muted small d-block">Entidad / ERP</span>
+                    <div class="field-editor-inline">
+                      <strong id="modal-entidad" class="editable-value"></strong>
+                      <button type="button" class="field-editor-trigger" data-field-editor="modal-entidad" title="Editar entidad" aria-label="Editar entidad">✎</button>
+                      <button type="button" class="field-editor-confirm" data-field-action="confirm" title="Confirmar cambio" aria-label="Confirmar cambio">✓</button>
+                      <button type="button" class="field-editor-cancel" data-field-action="cancel" title="Cancelar cambio" aria-label="Cancelar cambio">✕</button>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <span class="text-muted small d-block">Canal</span>
+                    <div class="field-editor-inline">
+                      <strong id="modal-canal" class="editable-value"></strong>
+                      <button type="button" class="field-editor-trigger" data-field-editor="modal-canal" title="Editar canal" aria-label="Editar canal">✎</button>
+                      <button type="button" class="field-editor-confirm" data-field-action="confirm" title="Confirmar cambio" aria-label="Confirmar cambio">✓</button>
+                      <button type="button" class="field-editor-cancel" data-field-action="cancel" title="Cancelar cambio" aria-label="Cancelar cambio">✕</button>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <span class="text-muted small d-block">Estado de gestión</span>
+                    <div class="field-editor-inline">
+                      <strong id="modal-estado-gestion" class="editable-value"></strong>
+                      <button type="button" class="field-editor-trigger" data-field-editor="modal-estado-gestion" title="Editar estado de gestión" aria-label="Editar estado de gestión">✎</button>
+                      <button type="button" class="field-editor-confirm" data-field-action="confirm" title="Confirmar cambio" aria-label="Confirmar cambio">✓</button>
+                      <button type="button" class="field-editor-cancel" data-field-action="cancel" title="Cancelar cambio" aria-label="Cancelar cambio">✕</button>
+                    </div>
+                  </div>
+                  <div class="col-md-6"><span class="text-muted small d-block">Fecha de factura</span><strong id="modal-fecha-factura"></strong></div>
+                  <div class="col-md-6"><span class="text-muted small d-block">Fecha de radicación</span><strong id="modal-fecha-radicacion"></strong></div>
+                  <div class="col-md-6"><span class="text-muted small d-block">Fecha de importación</span><strong id="modal-fecha-importacion"></strong></div>
+                  <div class="col-md-6">
+                    <span class="text-muted small d-block">Campos actualizados</span>
+                    <div class="d-flex align-items-center gap-2">
+                      <strong id="modal-campos-actualizados" class="text-primary" title=""></strong>
+                      <button type="button" class="btn btn-sm btn-outline-primary" id="btn-ver-campos-actualizados">
+                        Ver campos
+                      </button>
+                    </div>
+                  </div>
+                  <div class="col-md-6"><span class="text-muted small d-block">Edad de cartera</span><strong><span id="modal-edad"></span> días</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <h6 class="fw-semibold mb-3">Valores</h6>
+                <ul class="list-group list-group-flush rounded-3 overflow-hidden">
+                  <li class="list-group-item d-flex justify-content-between align-items-center"><span>Valor bruto</span><strong>$<span id="modal-valor-bruto"></span></strong></li>
+                  <li class="list-group-item d-flex justify-content-between align-items-center"><span>Pagos</span><strong>$<span id="modal-pagos"></span></strong></li>
+                  <li class="list-group-item d-flex justify-content-between align-items-center"><span>Valor neto</span><strong>$<span id="modal-valor-neto"></span></strong></li>
+                  <li class="list-group-item d-flex justify-content-between align-items-center"><span>Saldo pendiente</span><strong>$<span id="modal-saldo"></span></strong></li>
+                </ul>
+                <div class="mt-3 small text-muted">Fórmula aplicada: Valor Neto = Valor Bruto - Pagos reales (aceptado IPS + abonos + RTF). El saldo se recalcula con los movimientos PAE cuando existen.</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                  <h6 class="fw-semibold mb-0">Cruce PAE/DIF</h6>
+                  <span id="badge-eventos-pae" class="badge rounded-pill bg-info-subtle text-info-emphasis"></span>
+                </div>
+                <p class="text-muted small mb-3">La factura base se conserva desde DIF; PAE la enriquece con eventos, glosas y abonos cuando hay coincidencia por número o atención.</p>
+                <div class="row g-3">
+                  <div class="col-md-6"><span class="text-muted small d-block">Estado de glosa</span><strong id="modal-glosa"></strong></div>
+                  <div class="col-md-6"><span class="text-muted small d-block">Fuente de datos</span><strong id="modal-fuente-datos"></strong></div>
+                  <div class="col-md-6"><span class="text-muted small d-block">Abonos PAE</span><strong id="modal-abonos"></strong></div>
+                  <div class="col-md-6"><span class="text-muted small d-block">RTF total</span><strong>$<span id="modal-rtf"></span></strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 bg-white">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="paeCambiosModal" tabindex="-1" aria-labelledby="paeCambiosModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-md">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title" id="paeCambiosModalLabel">Campos actualizados</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Revisa el valor anterior y el valor nuevo por cada campo que actualizó el archivo PAE.</p>
+        <ul class="list-group" id="lista-pae-cambios"></ul>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+    document.getElementById('selectAll').addEventListener('change', function () {
+        const checked = this.checked;
+        document.querySelectorAll('.select-factura').forEach(function (checkbox) {
+            checkbox.checked = checked;
+        });
+    });
+
+      document.getElementById('exportar-seleccionadas').addEventListener('click', function (event) {
+        const seleccionadas = Array.from(document.querySelectorAll('.select-factura:checked'));
+        if (seleccionadas.length === 0) {
+          event.preventDefault();
+          alert('Seleccione al menos una factura para exportar.');
+          return;
+        }
+        const url = new URL(this.href, window.location.origin);
+        seleccionadas.forEach(function (checkbox) {
+          url.searchParams.append('factura_ids', checkbox.value);
+        });
+        this.href = url.toString();
+      });
+
+    const detalleModal = document.getElementById('detalleFacturaModal');
+    detalleModal.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        detalleModal.dataset.facturaId = button.getAttribute('data-factura-id') || '';
+        document.getElementById('modal-num-factura').textContent = button.getAttribute('data-num-factura') || '—';
+        document.getElementById('modal-paciente').textContent = button.getAttribute('data-paciente') || '—';
+        document.getElementById('modal-entidad').textContent = button.getAttribute('data-entidad') || '—';
+        document.getElementById('modal-valor-bruto').textContent = button.getAttribute('data-valor-bruto') || '0.00';
+        document.getElementById('modal-pagos').textContent = button.getAttribute('data-pagos') || '0.00';
+        document.getElementById('modal-valor-neto').textContent = button.getAttribute('data-valor-neto') || '0.00';
+        document.getElementById('modal-saldo').textContent = button.getAttribute('data-saldo') || '0.00';
+        document.getElementById('modal-edad').textContent = button.getAttribute('data-edad') || '0';
+        document.getElementById('modal-glosa').textContent = button.getAttribute('data-glosa') || 'Available soon';
+        document.getElementById('modal-fecha-radicacion').textContent = button.getAttribute('data-fecha-radicacion') || '—';
+        document.getElementById('modal-fecha-factura').textContent = button.getAttribute('data-fecha-factura') || '—';
+        document.getElementById('modal-fecha-importacion').textContent = button.getAttribute('data-fecha-importacion') || '—';
+        const camposActualizados = button.getAttribute('data-campos-actualizados') || 'Sin actualizaciones PAE';
+        const totalAbonosPae = button.getAttribute('data-total-abonos') || '0';
+        const rtfPae = button.getAttribute('data-rtf') || '0.00';
+        const modalAbonos = document.getElementById('modal-abonos');
+        const totalAbonos = Number.parseFloat(String(totalAbonosPae).replace(',', '.')) || 0;
+        modalAbonos.textContent = '$' + totalAbonos.toLocaleString('es-CO', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+        const rtfValor = Number.parseFloat(String(rtfPae || '0').replace(',', '.'));
+        document.getElementById('modal-rtf').textContent = Number.isFinite(rtfValor) ? rtfValor.toLocaleString('es-CO', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00';
+        const campoActualizadoEl = document.getElementById('modal-campos-actualizados');
+        campoActualizadoEl.textContent = camposActualizados;
+        campoActualizadoEl.setAttribute('title', button.getAttribute('data-pae-cambios-preview') || 'Sin cambios aplicados');
+        campoActualizadoEl.classList.add('text-primary');
+        campoActualizadoEl.style.cursor = 'help';
+
+        const botonVerCampos = document.getElementById('btn-ver-campos-actualizados');
+        botonVerCampos.setAttribute('data-pae-cambios', button.getAttribute('data-pae-cambios') || '[]');
+        botonVerCampos.setAttribute('title', button.getAttribute('data-pae-cambios-preview') || 'Sin cambios aplicados');
+        botonVerCampos.setAttribute('data-bs-original-title', button.getAttribute('data-pae-cambios-preview') || 'Sin cambios aplicados');
+        botonVerCampos.setAttribute('data-pae-cambios-preview', button.getAttribute('data-pae-cambios-preview') || 'Sin cambios aplicados');
+
+        document.getElementById('modal-canal').textContent = button.getAttribute('data-canal') || '—';
+        document.getElementById('modal-identificacion').textContent = button.getAttribute('data-identificacion') || '—';
+        document.getElementById('modal-celular').textContent = button.getAttribute('data-celular') || '—';
+        document.getElementById('modal-estado-gestion').textContent = button.getAttribute('data-estado-gestion') || '—';
+        document.getElementById('modal-fuente-datos').textContent = button.getAttribute('data-fuente-datos') || 'DIF';
+        document.getElementById('btn-ver-campos-actualizados').setAttribute('data-pae-cambios', button.getAttribute('data-pae-cambios') || '[]');
+        document.getElementById('btn-ver-campos-actualizados').setAttribute('title', button.getAttribute('data-pae-cambios-preview') || 'Sin cambios aplicados');
+        document.getElementById('btn-ver-campos-actualizados').setAttribute('data-bs-original-title', button.getAttribute('data-pae-cambios-preview') || 'Sin cambios aplicados');
+        document.getElementById('btn-ver-campos-actualizados').setAttribute('data-pae-cambios-preview', button.getAttribute('data-pae-cambios-preview') || 'Sin cambios aplicados');
+        document.getElementById('modal-campos-actualizados').setAttribute('data-bs-toggle', 'tooltip');
+        document.getElementById('modal-campos-actualizados').setAttribute('title', button.getAttribute('data-pae-cambios-preview') || 'Sin cambios aplicados');
+        document.getElementById('modal-campos-actualizados').classList.add('text-decoration-underline', 'cursor-pointer');
+
+        const fuenteDatos = button.getAttribute('data-fuente-datos') || 'DIF';
+        const badgeFuente = document.getElementById('badge-fuente-datos');
+        badgeFuente.textContent = fuenteDatos;
+        badgeFuente.className = 'badge rounded-pill ' + (fuenteDatos === 'PAE + DIF' ? 'bg-success-subtle text-success-emphasis' : 'bg-primary-subtle text-primary-emphasis');
+
+        const eventosPae = Number(button.getAttribute('data-eventos-pae') || 0);
+        const badgeEventosPae = document.getElementById('badge-eventos-pae');
+        badgeEventosPae.textContent = eventosPae > 0 ? `${eventosPae} evento(s) PAE` : 'Sin eventos PAE';
+        badgeEventosPae.className = 'badge rounded-pill ' + (eventosPae > 0 ? 'bg-info-subtle text-info-emphasis' : 'bg-secondary-subtle text-secondary-emphasis');
+    });
+
+    function setupFieldEditorBehavior() {
+        document.querySelectorAll('.field-editor-inline').forEach(function (field) {
+            const trigger = field.querySelector('.field-editor-trigger');
+            const confirmBtn = field.querySelector('.field-editor-confirm');
+            const cancelBtn = field.querySelector('.field-editor-cancel');
+            const valueElement = field.querySelector('.editable-value');
+            if (!trigger || !confirmBtn || !cancelBtn || !valueElement) return;
+
+            const originalValue = function () {
+                return field.dataset.originalValue || (valueElement.textContent || '').trim();
+            };
+
+            const closeEditingState = function () {
+                field.classList.remove('is-editing');
+                field.dataset.originalValue = '';
+                const editor = field.querySelector('.field-editor-input-wrap');
+                if (editor) {
+                    editor.remove();
+                }
+                trigger.style.opacity = '';
+                trigger.style.visibility = '';
+                confirmBtn.style.opacity = '';
+                confirmBtn.style.visibility = '';
+                cancelBtn.style.opacity = '';
+                cancelBtn.style.visibility = '';
+            };
+
+            const saveCurrentValue = function () {
+                const editor = field.querySelector('.field-editor-input-wrap');
+                if (!editor) return;
+                const input = editor.querySelector('input, select');
+                if (!input) return;
+
+                const targetId = trigger.getAttribute('data-field-editor');
+                const fieldNameMap = {
+                    'modal-paciente': 'nombre_paciente',
+                    'modal-identificacion': 'historia_clinica',
+                    'modal-celular': 'tel_celular',
+                    'modal-entidad': 'erp',
+                    'modal-canal': 'nom_canal',
+                    'modal-estado-gestion': 'estado_gestion'
+                };
+                const facturaId = document.getElementById('detalleFacturaModal').dataset.facturaId;
+                const fieldName = fieldNameMap[targetId] || targetId;
+                const nextValue = (input.value || '').trim();
+                const payload = {
+                    field: fieldName,
+                    value: nextValue || ''
+                };
+
+                fetch(`/facturas/${facturaId}/actualizar-campo/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.cookie.split('; ').find(function (cookie) { return cookie.startsWith('csrftoken='); })?.split('=')[1] || ''
+                    },
+                    body: JSON.stringify(payload)
+                })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('No se pudo guardar el cambio.');
+                    }
+                    return response.json();
+                })
+                .then(function (json) {
+                    if (!json.ok) {
+                        throw new Error(json.error || 'No se pudo guardar el cambio.');
+                    }
+                    valueElement.textContent = nextValue || '—';
+                    closeEditingState();
+                })
+                .catch(function (error) {
+                    valueElement.textContent = originalValue() || '—';
+                    closeEditingState();
+                    alert(error.message || 'No se pudo guardar el cambio.');
+                });
+            };
+
+            trigger.addEventListener('click', function () {
+                if (field.classList.contains('is-editing')) return;
+                const currentValue = (valueElement.textContent || '').trim();
+                field.dataset.originalValue = currentValue;
+                field.classList.add('is-editing');
+
+                const editorWrap = document.createElement('div');
+                editorWrap.className = 'field-editor-input-wrap ms-2';
+
+                let editor;
+                const targetId = trigger.getAttribute('data-field-editor');
+                if (targetId === 'modal-entidad' || targetId === 'modal-canal' || targetId === 'modal-estado-gestion') {
+                    const select = document.createElement('select');
+                    select.className = 'form-select form-select-sm';
+                    const options = targetId === 'modal-entidad'
+                        ? ['EPS Test', 'Sanidad', 'Ninguna']
+                        : targetId === 'modal-canal'
+                            ? ['Directo', 'Call center', 'Portal', 'Red externa']
+                            : ['No Facturado', 'No Radicado', 'Radicado'];
+                    options.forEach(function (option) {
+                        const optionEl = document.createElement('option');
+                        optionEl.value = option;
+                        optionEl.textContent = option;
+                        if (option === currentValue) optionEl.selected = true;
+                        select.appendChild(optionEl);
+                    });
+                    editor = select;
+                } else {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = currentValue === '—' ? '' : currentValue;
+                    input.className = 'form-control form-control-sm';
+                    input.setAttribute('maxlength', '120');
+                    editor = input;
+                }
+
+                editorWrap.appendChild(editor);
+                valueElement.textContent = '';
+                valueElement.appendChild(editorWrap);
+                if (editor.focus) editor.focus();
+            });
+
+            confirmBtn.addEventListener('click', function () {
+                saveCurrentValue();
+            });
+
+            cancelBtn.addEventListener('click', function () {
+                const editorWrap = field.querySelector('.field-editor-input-wrap');
+                if (editorWrap) {
+                    editorWrap.remove();
+                }
+                valueElement.textContent = originalValue() || '—';
+                closeEditingState();
+            });
+        });
+    }
+
+    setupFieldEditorBehavior();
+
+    document.getElementById('btn-ver-campos-actualizados').addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const changesModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('paeCambiosModal'));
+        changesModal.show();
+    });
+
+    const paeCambiosModal = document.getElementById('paeCambiosModal');
+    paeCambiosModal.addEventListener('show.bs.modal', function () {
+        const lista = document.getElementById('lista-pae-cambios');
+        const btn = document.getElementById('btn-ver-campos-actualizados');
+        const raw = btn.getAttribute('data-pae-cambios') || '[]';
+        let cambios = [];
+
+        try {
+            const parsed = JSON.parse(raw);
+            cambios = Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            cambios = [];
+        }
+
+        if (!cambios.length) {
+            const previewText = btn.getAttribute('data-pae-cambios-preview') || 'Sin cambios aplicados';
+            const previewItems = previewText.split(';').map(function (part) { return part.trim(); }).filter(Boolean);
+            cambios = previewItems.map(function (part) {
+                const match = part.match(/^(.+?):\s*(.+?)\s*→\s*(.+)$/);
+                if (match) {
+                    return { campo: match[1], anterior: match[2], nuevo: match[3] };
+                }
+                return { campo: 'Cambio', anterior: '—', nuevo: part };
+            });
+        }
+
+        lista.innerHTML = '';
+        if (cambios.length === 0) {
+            lista.innerHTML = '<li class="list-group-item">No hay cambios registrados.</li>';
+        } else {
+            cambios.forEach(function (item) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.innerHTML = '<div class="d-flex justify-content-between align-items-start gap-3"><div><strong>' + (item.campo || 'Campo') + '</strong><div class="small text-muted mt-1">Antes: ' + (item.anterior || '—') + '</div><div class="small text-muted">Después: ' + (item.nuevo || '—') + '</div></div><span class="badge bg-light text-dark border">Cambio</span></div>';
+                lista.appendChild(li);
+            });
+        }
+    });
+
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+</script>
+
+{% endblock %}

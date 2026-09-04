@@ -1,0 +1,368 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClinicSoft-IPS™</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --azul-clinic: #4a6a8a;
+            --gris-fondo: #f4f7f6;
+        }
+
+        body { 
+            display: flex; 
+            min-height: 100vh; 
+            background-color: var(--gris-fondo); 
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        /* --- SPLASH SCREEN (INTRO) --- */
+        #splash-screen {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: white;
+            z-index: 10000; /* Por encima de todo */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 1s ease-out;
+        }
+        #intro-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Asegura resolución 1080p sin distorsión */
+        }
+        .fade-out { opacity: 0; pointer-events: none; }
+
+        /* --- SIDEBAR --- */
+        .sidebar { 
+            width: 260px; 
+            background: var(--azul-clinic); 
+            color: white; 
+            padding: 25px 15px;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        .sidebar-brand {
+            padding: 10px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .sidebar a { 
+            color: rgba(255,255,255,0.8); 
+            text-decoration: none; 
+            display: block; 
+            padding: 12px 15px; 
+            border-radius: 8px; 
+            margin-bottom: 5px;
+            transition: all 0.3s;
+        }
+        .sidebar a:hover { 
+            background: rgba(255,255,255,0.1); 
+            color: white; 
+            transform: translateX(5px);
+        }
+        .sidebar .active {
+            background: white !important;
+            color: var(--azul-clinic) !important;
+            font-weight: 600;
+        }
+
+        /* --- CONTENT --- */
+        .content { flex-grow: 1; padding: 40px; overflow-y: auto; }
+
+        #loadingOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(13, 27, 42, 0.45);
+            backdrop-filter: blur(2px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        #loadingOverlay.show {
+            display: flex;
+        }
+
+        .loading-card {
+            background: white;
+            border-radius: 18px;
+            padding: 28px 32px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.22);
+            text-align: center;
+            min-width: 260px;
+        }
+
+        .spinner-wrap {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 16px;
+            border: 4px solid rgba(74, 106, 138, 0.15);
+            border-top-color: var(--azul-clinic);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="splash-screen">
+        <video id="intro-video" autoplay muted playsinline>
+            <source src="{% static 'videos/intro_clinicsoft3.mp4' %}" type="video/mp4">
+            Tu navegador no soporta videos.
+        </video>
+    </div>
+
+    <div class="sidebar d-flex flex-column">
+        <div class="sidebar-brand">
+            <img src="{% static 'images/logo_tit.png' %}" alt="Logo" style="width: 100%; border-radius: 8px; padding: 0px;">
+        </div>
+        
+        <nav>
+            <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                <i class="fas fa-th-large me-2"></i> Dashboard
+            </a>
+            <a href="{% url 'subir_cartera' %}" class="{% if request.resolver_match.url_name == 'subir_cartera' %}active{% endif %}">
+                <i class="fas fa-cloud-upload-alt me-2"></i> Cargar DIF/PAE
+            </a>
+            <a href="{% url 'lista_facturas' %}" class="{% if request.resolver_match.url_name == 'lista_facturas' %}active{% endif %}">
+                <i class="fas fa-list-ul me-2"></i> Ver Facturas
+            </a>
+            <a href="{% url 'import_logs' %}" class="{% if request.resolver_match.url_name == 'import_logs' %}active{% endif %}">
+                <i class="fas fa-file-alt me-2"></i> Logs de Importación
+            </a>
+            
+            <!-- BOTÓN DE LIMPIEZA (modal de confirmación) -->
+            <hr style="opacity: 0.1; margin: 15px 0;">
+            <button type="button" class="btn btn-warning text-start" style="font-size: 0.9em; width: 100%;" data-bs-toggle="modal" data-bs-target="#confirmLimpiarBaseModal">
+                <i class="fas fa-trash-alt me-2"></i> Limpiar Base de Datos
+            </button>
+            <a href="{% url 'environments' %}" class="mt-2 {% if request.resolver_match.url_name == 'environments' %}active{% endif %}">
+                <i class="fas fa-layer-group me-2"></i> Environments
+            </a>
+        </nav>
+
+        <div class="mt-auto text-center">
+            <hr style="opacity: 0.2;">
+            <p class="small mb-0" style="opacity: 0.6;">ClinicSoft-IPS™ v1.1</p>
+        </div>
+    </div>
+
+    <div class="content">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <div id="loadingOverlay" aria-live="polite" aria-label="Indicador de carga">
+        <div class="loading-card">
+            <div class="spinner-wrap"></div>
+            <div class="fw-semibold text-dark" id="loadingText">Procesando...</div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="successProcessModal" tabindex="-1" aria-labelledby="successProcessModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+          <div class="modal-header border-0 bg-success text-white">
+            <h5 class="modal-title" id="successProcessModalLabel">Proceso completado</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body text-center py-4">
+            <div class="mb-3">
+              <span class="badge bg-success-subtle text-success fs-4 rounded-circle p-3"><i class="fas fa-check"></i></span>
+            </div>
+            <p class="mb-0 fs-5 fw-semibold text-dark" id="successProcessMessage">Procesado correctamente.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const splash = document.getElementById('splash-screen');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingText = document.getElementById('loadingText');
+            const successModal = document.getElementById('successProcessModal');
+            const successMessage = document.getElementById('successProcessMessage');
+
+            function showLoading(message = 'Procesando...') {
+                if (loadingText) loadingText.textContent = message;
+                if (loadingOverlay) loadingOverlay.classList.add('show');
+            }
+
+            function hideLoading() {
+                if (loadingOverlay) loadingOverlay.classList.remove('show');
+            }
+
+            function showSuccess(message = 'Procesado correctamente.') {
+                if (successMessage) successMessage.textContent = message;
+                if (successModal) {
+                    const modal = bootstrap.Modal.getOrCreateInstance(successModal);
+                    modal.show();
+                }
+            }
+
+            function getSuccessTextFromAlerts() {
+                const alert = document.querySelector('.alert-success');
+                if (!alert) return '';
+                return alert.textContent.replace(/\s+/g, ' ').trim();
+            }
+
+            function triggerSuccessTextFromButton(button) {
+                const successMessageText = button.dataset.successMessage || 'Procesado correctamente.';
+                setTimeout(function() {
+                    hideLoading();
+                    showSuccess(successMessageText);
+                }, 350);
+            }
+
+            // Si ya se mostró en esta sesión, lo ocultamos de inmediato
+            if (sessionStorage.getItem('introMostrada')) {
+                splash.style.display = 'none';
+            } else {
+                // Primera vez: esperamos a que cargue y lo desvanecemos
+                window.addEventListener('load', function() {
+                    setTimeout(() => {
+                        splash.classList.add('fade-out');
+                        setTimeout(() => {
+                            splash.style.display = 'none';
+                        }, 1000); // Tiempo de la transición CSS
+                        
+                        sessionStorage.setItem('introMostrada', 'true');
+                    }, 4000); // 4 segundos de video
+                });
+            }
+
+            document.querySelectorAll('form').forEach(function(form) {
+                form.addEventListener('submit', function() {
+                    const submitButton = form.querySelector('button[type="submit"]');
+                    const label = submitButton && submitButton.dataset.processingLabel
+                        ? submitButton.dataset.processingLabel
+                        : 'Procesando...';
+                    showLoading(label);
+                    if (submitButton && submitButton.dataset.successMessage) {
+                        form.dataset.successMessage = submitButton.dataset.successMessage;
+                    }
+                });
+            });
+
+            document.addEventListener('keydown', function(event) {
+                if (event.ctrlKey && event.altKey && event.key.toLowerCase() === 'd') {
+                    event.preventDefault();
+                    if (window.pywebview && window.pywebview.api) {
+                        window.pywebview.api.toggle_console();
+                    }
+                }
+            });
+
+            document.querySelectorAll('[data-export-process]').forEach(function(link) {
+                link.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    const href = this.getAttribute('href');
+                    const label = this.dataset.exportProcess || 'Exportando EAS...';
+                    const successText = this.dataset.successMessage || 'Procesado correctamente: EAS exportado.';
+                    showLoading(label);
+
+                    fetch(href, { method: 'GET', credentials: 'same-origin' })
+                        .then(function(response) {
+                            if (!response.ok) {
+                                throw new Error('No se pudo exportar el EAS');
+                            }
+                            const contentDisposition = response.headers.get('Content-Disposition') || '';
+                            const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+                            return response.blob().then(function(blob) {
+                                return {blob: blob, filename: filenameMatch ? filenameMatch[1] : null};
+                            });
+                        })
+                        .then(async function(download) {
+                            const filename = download.filename || 'EAS.xlsx';
+                            let saved = false;
+                            if (window.pywebview && window.pywebview.api) {
+                                const bytes = new Uint8Array(await download.blob.arrayBuffer());
+                                let binary = '';
+                                const chunkSize = 0x8000;
+                                for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+                                    binary += String.fromCharCode.apply(null, bytes.subarray(offset, offset + chunkSize));
+                                }
+                                saved = await window.pywebview.api.save_export(filename, btoa(binary));
+                            } else {
+                                const url = window.URL.createObjectURL(download.blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = filename;
+                                document.body.appendChild(a);
+                                a.click();
+                                a.remove();
+                                window.URL.revokeObjectURL(url);
+                                saved = true;
+                            }
+                            hideLoading();
+                            if (saved) showSuccess(successText);
+                            else showSuccess('Exportación cancelada.');
+                        })
+                        .catch(function() {
+                            hideLoading();
+                            showSuccess('No se pudo completar la exportación del EAS.');
+                        });
+                });
+            });
+
+            const successText = getSuccessTextFromAlerts();
+            if (successText) {
+                const successMessageText = successText.includes('Error') ? successText : 'Procesado correctamente.';
+                setTimeout(function() {
+                    hideLoading();
+                    showSuccess(successMessageText);
+                }, 300);
+            }
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Modal de confirmación para limpiar la base de datos -->
+    <div class="modal fade" id="confirmLimpiarBaseModal" tabindex="-1" aria-labelledby="confirmLimpiarBaseLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+          <div class="modal-header bg-warning text-dark border-0">
+            <h5 class="modal-title" id="confirmLimpiarBaseLabel">Limpiar base de datos</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-3">Esta acción eliminará todos los registros de facturas y eventos en el sistema.</p>
+            <p class="small text-muted mb-0">Use esta opción solo para pruebas o para restablecer la base. No podrá deshacerla.</p>
+          </div>
+          <div class="modal-footer border-0">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">No, volver</button>
+            <a href="{% url 'limpiar_cartera' %}" class="btn btn-danger">Sí, limpiar datos</a>
+          </div>
+        </div>
+      </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,57 @@
+{% extends 'facturacion/base.html' %}
+
+{% block content %}
+<div class="container-fluid px-0" style="max-width: 900px;">
+    <h3 class="fw-bold mb-1">Environments</h3>
+    <p class="text-muted mb-4">Seleccione el conjunto de datos operativo que desea utilizar.</p>
+
+    <form method="post" class="card border-0 shadow-sm p-4">
+        {% csrf_token %}
+        <label for="environment" class="form-label fw-semibold">Environment</label>
+        <select id="environment" name="environment" class="form-select mb-3">
+            {% for item in environments %}
+            <option value="{{ item.pk }}" data-nickname="{{ item.nickname|escape }}" data-comentario="{{ item.comentario|escape }}" {% if item.pk == selected_environment.pk %}selected{% endif %}>
+                {{ item.numero }}{% if item.nickname %} - {{ item.nickname }}{% endif %}
+            </option>
+            {% endfor %}
+        </select>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label for="nickname" class="form-label">Nickname</label>
+                <input id="nickname" name="nickname" value="{{ selected_environment.nickname }}" maxlength="100" class="form-control">
+            </div>
+            <div class="col-md-6">
+                <label for="password" class="form-label">Contraseña</label>
+                <input id="password" name="password" type="password" class="form-control" autocomplete="new-password" placeholder="Dejar vacío para conservarla">
+            </div>
+            <div class="col-12">
+                <label for="comentario" class="form-label">Comentario</label>
+                <textarea id="comentario" name="comentario" maxlength="255" rows="2" class="form-control">{{ selected_environment.comentario }}</textarea>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-4">
+            <button type="submit" name="cancelar" value="1" class="btn btn-outline-secondary">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Aplicar</button>
+        </div>
+    </form>
+
+    <div class="mt-4">
+        {% for item in environments %}
+        <div class="border-bottom py-2 d-flex justify-content-between">
+            <strong>{{ item.numero }}{% if item.nickname %} - {{ item.nickname }}{% endif %}</strong>
+            <span class="text-muted small">{{ item.comentario }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+<script>
+document.getElementById('environment').addEventListener('change', function () {
+    const option = this.options[this.selectedIndex];
+    document.getElementById('nickname').value = option.dataset.nickname || '';
+    document.getElementById('comentario').value = option.dataset.comentario || '';
+    document.getElementById('password').value = '';
+});
+</script>
+{% endblock %}

@@ -1,0 +1,310 @@
+{% extends 'facturacion/base.html' %}
+
+{% block content %}
+<div style="max-width: 1180px;">
+    <div class="d-flex justify-content-between align-items-center mb-4 gap-3 flex-wrap">
+        <div>
+            <h3 class="fw-bold">📚 Logs de importación</h3>
+            <p class="text-muted small mb-0">Registros de carga de archivos DIF y PAE ordenados por fecha.</p>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <label class="small text-muted mb-0" for="logs-per-page">Ver</label>
+            <select id="logs-per-page" class="form-select form-select-sm w-auto">
+                <option value="200" {% if per_page == 200 %}selected{% endif %}>200</option>
+                <option value="500" {% if per_page == 500 %}selected{% endif %}>500</option>
+            </select>
+            <button type="button" id="btn-clear-selected" class="btn btn-outline-danger btn-sm">Borrar seleccionados</button>
+            <button type="button" id="btn-clear-all" class="btn btn-danger btn-sm">Limpiar todo</button>
+            <a href="{% url 'subir_cartera' %}" class="btn btn-outline-primary btn-sm">Subir nuevo archivo</a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <input class="form-check-input log-select-all" type="checkbox" data-target="dif" aria-label="Seleccionar DIF logs">
+                        <h5 class="fw-bold mb-0">DIF Logs</h5>
+                    </div>
+                    <span class="badge bg-primary">{{ dif_page_obj.paginator.count }}</span>
+                </div>
+                {% if dif_page_obj.object_list %}
+                    <div class="list-group list-group-flush">
+                        {% for log in dif_page_obj.object_list %}
+                        <div class="list-group-item py-3">
+                            <div class="d-flex align-items-start gap-2">
+                                <input class="form-check-input log-select" type="checkbox" value="{{ log.id }}" data-tipo="DIF" aria-label="Seleccionar log DIF" style="margin-top: 0.5rem;">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                        <div>
+                                            <a href="{% url 'import_log_detail' log.id %}" class="badge bg-info text-dark mb-2 text-decoration-none">{{ log.codigo }}</a>
+                                            <h6 class="mb-1">{{ log.descripcion|default:'Subida DIF' }}</h6>
+                                            <p class="text-muted small mb-1">Creado el {{ log.creado_en|date:'d/m/Y H:i' }}</p>
+                                        </div>
+                                        <div class="text-end text-muted small">
+                                            <div><strong>Tipo:</strong> {{ log.tipo }}</div>
+                                            <div><strong>Entradas:</strong> {{ log.detalles|length }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 text-end">
+                                        <a href="{% url 'import_log_detail' log.id %}" class="btn btn-sm btn-outline-primary">Abrir log</a>
+                                    </div>
+                                    <div class="mt-3">
+                                        {% if log.resumen.filas_en_excel is not None %}
+                                        <div class="row g-2 text-muted small">
+                                            <div class="col-6">Filas Excel: {{ log.resumen.filas_en_excel }}</div>
+                                            <div class="col-6">Procesadas: {{ log.resumen.filas_procesadas }}</div>
+                                            <div class="col-6">Creadas: {{ log.resumen.creadas }}</div>
+                                            <div class="col-6">Actualizadas: {{ log.resumen.actualizadas }}</div>
+                                            <div class="col-6">Duplicadas: {{ log.resumen.filas_duplicadas }}</div>
+                                            <div class="col-6">Errores: {{ log.resumen.errores|length }}</div>
+                                        </div>
+                                        {% endif %}
+                                        {% if log.detalles %}
+                                        <div class="mt-3">
+                                            <strong class="small text-secondary">Detalle</strong>
+                                            <ul class="list-group list-group-flush mt-2">
+                                                {% for detalle in log.detalles|slice:":5" %}
+                                                <li class="list-group-item py-2">{{ detalle }}</li>
+                                                {% endfor %}
+                                            </ul>
+                                            {% if log.detalles|length > 5 %}
+                                            <p class="small text-muted mt-2">Mostrando 5 de {{ log.detalles|length }} entradas.</p>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <nav aria-label="Paginación DIF" class="mt-3">
+                        <ul class="pagination justify-content-center mb-0">
+                            {% if dif_page_obj.has_previous %}
+                            <li class="page-item"><a class="page-link" href="?per_page={{ per_page }}&dif_page={{ dif_page_obj.previous_page_number }}&pae_page={{ pae_page_obj.number }}">Anterior</a></li>
+                            {% endif %}
+                            <li class="page-item disabled"><span class="page-link">DIF {{ dif_page_obj.number }}/{{ dif_page_obj.paginator.num_pages }}</span></li>
+                            {% if dif_page_obj.has_next %}
+                            <li class="page-item"><a class="page-link" href="?per_page={{ per_page }}&dif_page={{ dif_page_obj.next_page_number }}&pae_page={{ pae_page_obj.number }}">Siguiente</a></li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% else %}
+                    <p class="text-muted small">No hay logs de DIF disponibles.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <input class="form-check-input log-select-all" type="checkbox" data-target="pae" aria-label="Seleccionar PAE logs">
+                        <h5 class="fw-bold mb-0">PAE Logs</h5>
+                    </div>
+                    <span class="badge bg-success">{{ pae_page_obj.paginator.count }}</span>
+                </div>
+                {% if pae_page_obj.object_list %}
+                    <div class="list-group list-group-flush">
+                        {% for log in pae_page_obj.object_list %}
+                        <div class="list-group-item py-3">
+                            <div class="d-flex align-items-start gap-2">
+                                <input class="form-check-input log-select" type="checkbox" value="{{ log.id }}" data-tipo="PAE" aria-label="Seleccionar log PAE" style="margin-top: 0.5rem;">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                        <div>
+                                            <a href="{% url 'import_log_detail' log.id %}" class="badge bg-info text-dark mb-2 text-decoration-none">{{ log.codigo }}</a>
+                                            <h6 class="mb-1">{{ log.descripcion|default:'Subida PAE' }}</h6>
+                                            <p class="text-muted small mb-1">Creado el {{ log.creado_en|date:'d/m/Y H:i' }}</p>
+                                        </div>
+                                        <div class="text-end text-muted small">
+                                            <div><strong>Tipo:</strong> {{ log.tipo }}</div>
+                                            <div><strong>Entradas:</strong> {{ log.detalles|length }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 text-end">
+                                        <a href="{% url 'import_log_detail' log.id %}" class="btn btn-sm btn-outline-success">Abrir log</a>
+                                    </div>
+                                    {% if log.detalles %}
+                                    <div class="mt-3">
+                                        <strong class="small text-secondary">Detalle</strong>
+                                        <ul class="list-group list-group-flush mt-2">
+                                            {% for detalle in log.detalles|slice:":5" %}
+                                            <li class="list-group-item py-2">{{ detalle }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% if log.detalles|length > 5 %}
+                                        <p class="small text-muted mt-2">Mostrando 5 de {{ log.detalles|length }} entradas.</p>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <nav aria-label="Paginación PAE" class="mt-3">
+                        <ul class="pagination justify-content-center mb-0">
+                            {% if pae_page_obj.has_previous %}
+                            <li class="page-item"><a class="page-link" href="?per_page={{ per_page }}&dif_page={{ dif_page_obj.number }}&pae_page={{ pae_page_obj.previous_page_number }}">Anterior</a></li>
+                            {% endif %}
+                            <li class="page-item disabled"><span class="page-link">PAE {{ pae_page_obj.number }}/{{ pae_page_obj.paginator.num_pages }}</span></li>
+                            {% if pae_page_obj.has_next %}
+                            <li class="page-item"><a class="page-link" href="?per_page={{ per_page }}&dif_page={{ dif_page_obj.number }}&pae_page={{ pae_page_obj.next_page_number }}">Siguiente</a></li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% else %}
+                    <p class="text-muted small">No hay logs de PAE disponibles.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="confirmDeleteLogsModal" tabindex="-1" aria-labelledby="confirmDeleteLogsLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-warning text-dark border-0">
+        <h5 class="modal-title" id="confirmDeleteLogsLabel">Borrar logs de importación</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">¿Seguro que quieres borrar los logs de importación?</p>
+        <p class="small text-muted mb-0">Esta acción eliminará los registros seleccionados y no podrá deshacerse.</p>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">No, volver</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteLogsAction">Sí, borrar logs</button>
+      </div>
+    </div>
+  </div>
+</div>
+<form class="d-none" aria-hidden="true">{% csrf_token %}</form>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+    function getCookie(name) {
+        const v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+        return v ? v[2] : null;
+    }
+
+    function getCsrfToken() {
+        const formToken = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        return formToken ? formToken.value : getCookie('clinicsoftcsrftoken');
+    }
+
+    const confirmDeleteLogsModal = new bootstrap.Modal(document.getElementById('confirmDeleteLogsModal'));
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
+    const successProcessModal = document.getElementById('successProcessModal');
+    const successProcessMessage = document.getElementById('successProcessMessage');
+    let deleteLogsMode = 'selected';
+    let deleteLogsIds = [];
+
+    function showLogsLoading(message) {
+        if (loadingText) loadingText.textContent = message;
+        if (loadingOverlay) loadingOverlay.classList.add('show');
+    }
+
+    function hideLogsLoading() {
+        if (loadingOverlay) loadingOverlay.classList.remove('show');
+    }
+
+    function showLogsSuccess(message) {
+        if (successProcessMessage) successProcessMessage.textContent = message;
+        if (successProcessModal) bootstrap.Modal.getOrCreateInstance(successProcessModal).show();
+    }
+
+    function openDeleteLogsModal(mode, ids = []) {
+        deleteLogsMode = mode;
+        deleteLogsIds = ids;
+        confirmDeleteLogsModal.show();
+    }
+
+    const perPageSelect = document.getElementById('logs-per-page');
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', function () {
+            const params = new URLSearchParams(window.location.search);
+            params.set('per_page', this.value);
+            params.delete('dif_page');
+            params.delete('pae_page');
+            window.location.search = params.toString();
+        });
+    }
+
+    const logSelectAlls = document.querySelectorAll('.log-select-all');
+    logSelectAlls.forEach(function (checkbox) {
+        checkbox.addEventListener('change', function () {
+            const target = this.dataset.target;
+            document.querySelectorAll('.log-select').forEach(function (item) {
+                if ((item.dataset.tipo || '').toLowerCase() === target) {
+                    item.checked = checkbox.checked;
+                }
+            });
+        });
+    });
+
+    function deleteSelectedLogs() {
+        const ids = Array.from(document.querySelectorAll('.log-select:checked')).map(function (item) {
+            return Number(item.value);
+        });
+        if (!ids.length) {
+            alert('Selecciona al menos un log para borrar.');
+            return;
+        }
+        openDeleteLogsModal('selected', ids);
+    }
+
+    function deleteAllLogs() {
+        openDeleteLogsModal('all');
+    }
+
+    const confirmDeleteLogsAction = document.getElementById('confirmDeleteLogsAction');
+    if (confirmDeleteLogsAction) {
+        confirmDeleteLogsAction.addEventListener('click', function () {
+            const payload = deleteLogsMode === 'all'
+                ? { modo: 'all' }
+                : { ids: deleteLogsIds };
+
+            confirmDeleteLogsModal.hide();
+            showLogsLoading('Borrando logs...');
+            fetch('{% url "limpiar_import_logs" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(function (response) { return response.json(); })
+            .then(function (json) {
+                hideLogsLoading();
+                if (json.ok) {
+                    showLogsSuccess(json.mensaje || 'Los logs de importación se borraron correctamente.');
+                    window.setTimeout(function () { window.location.reload(); }, 1000);
+                } else {
+                    alert(json.error || 'No se pudieron borrar los logs.');
+                }
+            })
+            .catch(function (error) {
+                hideLogsLoading();
+                alert('Error al borrar logs: ' + error.message);
+            });
+        });
+    }
+
+    const clearSelectedBtn = document.getElementById('btn-clear-selected');
+    if (clearSelectedBtn) {
+        clearSelectedBtn.addEventListener('click', deleteSelectedLogs);
+    }
+
+    const clearAllBtn = document.getElementById('btn-clear-all');
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', deleteAllLogs);
+    }
+    });
+</script>
+{% endblock %}
