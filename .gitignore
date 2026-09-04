@@ -27,7 +27,6 @@ media
 .Python
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -139,6 +138,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+dist/ClinicSoft-IPS/_internal
 
 # Spyder project settings
 .spyderproject
